@@ -8,6 +8,8 @@
 
 import UIKit
 
+import BDBOAuth1Manager
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -17,6 +19,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         return true
+    }
+    
+    func application(_ app: UIApplication, open url: URL, options: [UIApplicationOpenURLOptionsKey : Any] = [:]) -> Bool {
+        switch(url){
+            case URL(string:"oauth")!:
+                print("oauth request token return");
+                
+                let request = BDBOAuth1Credential(queryString: "oauth_token")
+                let client = Twitter.client()
+                
+                client?.requestToken = request;
+                client?.askAccessToken()
+                
+                break;
+            default:
+                print(url)
+        }
+        return true;
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
