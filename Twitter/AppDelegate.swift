@@ -17,25 +17,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
+        UINavigationBar.appearance().barTintColor = UIColor(red:0.00, green:0.67, blue:0.93, alpha:1.0)
+        UINavigationBar.appearance().tintColor = UIColor.white
         // Override point for customization after application launch.
         return true
     }
     
     func application(_ app: UIApplication, open url: URL, options: [UIApplicationOpenURLOptionsKey : Any] = [:]) -> Bool {
-        switch(url){
-            case URL(string:"oauth")!:
-                print("oauth request token return");
+        
+        if let queries = url.query?.components(separatedBy: "&") {
+            let isAccepted = queries.filter({ (q) -> Bool in
+                return q.contains("oauth_token")
+            })
+            if isAccepted.count > 0 {
                 
-                let request = BDBOAuth1Credential(queryString: "oauth_token")
-                let client = Twitter.client()
+                print("oauth request token return",url);
+
+                let request = BDBOAuth1Credential(queryString: url.query)
+                let client = Twitter.client()!
                 
-                client?.requestToken = request;
-                client?.askAccessToken()
-                
-                break;
-            default:
-                print(url)
+                client.requestToken = request;
+                client.askAccessToken()
+            }
         }
+        
+        
         return true;
     }
 

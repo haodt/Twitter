@@ -11,29 +11,109 @@ import UIKit
 import AFNetworking
 import BDBOAuth1Manager
 
-let consumerKey = "JWJtknZ97A6n5XtXgA3PfpYto"
-let consumerSecret = "0KGsDwfeKftIOUomJFBcjIyR2oQw8cZbOZCNvQiiEVZs3doHhE"
+let consumerKey = "JxUiG0fZyXliskmGJZYLjZcc4"
+let consumerSecret = "2rW7IMZQ9Iz73JTwm800PGoaRHTPa3Vz59nDRXx2I1NIEaiipo"
+
+struct User {
+
+    var name:String
+    var screen_name:String
+    var profile_image_url_https:String
+    
+    init(dictionary:NSDictionary){
+        name = dictionary["name"] as! String
+        screen_name = dictionary["screen_name"] as! String
+        profile_image_url_https = dictionary["profile_image_url_https"] as! String
+    }
+    
+}
 
 class Twitter: BDBOAuth1SessionManager {
 
     var accessToken:BDBOAuth1Credential!{
         didSet{
-            let cache = NSCache<NSString, BDBOAuth1Credential>()
+            let cache = UserDefaults.standard
+            let data = NSKeyedArchiver.archivedData(withRootObject: accessToken)
             
-            cache.setObject(accessToken, forKey: "accessToken")
+            cache.set(data, forKey: "accessToken")
             self.requestSerializer.saveAccessToken(accessToken)
         }
     }
     
     var requestToken:BDBOAuth1Credential!{
         didSet{
-            // Caching
-            let cache = NSCache<NSString, BDBOAuth1Credential>()
-            
-            cache.setObject(requestToken, forKey: "requestToken")
+            let cache = UserDefaults.standard
+            let data = NSKeyedArchiver.archivedData(withRootObject: requestToken)
+            cache.set(data, forKey: "requestToken")
         }
     }
     
+    private var _user:User?{
+        didSet{
+
+        }
+    }
+    
+    func user(completion:@escaping((User)->Void)) -> Void{
+        if _user == nil {
+            
+            let parameters:[String:Any] = [
+                "include_email":false
+            ];
+            
+            self.get(
+                "1.1/account/verify_credentials.json",
+                parameters: parameters,
+                progress: nil,
+                success: { (task, response:Any) in
+                    if let response = response as? NSDictionary {
+                        self._user = User(dictionary: response)
+                        completion(self._user!)
+                    }
+                },
+                failure: { (task, error:Error) in
+                    print("failed to get user setting \(error.localizedDescription)")
+                }
+            )
+            return
+        }
+        
+        completion(_user!)
+    }
+    
+    private var _status:String?
+    
+    func tweet(status:String,completion:@escaping ((Tweet) -> Void),replyTo:Tweet?){
+        
+        if _status == status {
+            print("user cannot post same status in a row")
+            return
+        }
+        
+        var parameters:[String:Any] = [
+            "status":status
+        ]
+        
+        if let replyTo = replyTo {
+            parameters["in_reply_to_status_id"] = replyTo.id
+        }
+        
+        post(
+            "1.1/statuses/update.json",
+            parameters: parameters,
+            progress: nil,
+            success: { (task, response:Any) in
+                if let response = response as? NSDictionary {
+                    let tweet = Tweet(dictionary: response)
+                    completion(tweet)
+                }
+            },
+            failure: { (task, error:Error) in
+                print("failed to update new status \(error.localizedDescription)")
+            }
+        )
+        
+    }
     
     private static var _client:Twitter!
     
@@ -46,17 +126,24 @@ class Twitter: BDBOAuth1SessionManager {
                 consumerSecret: consumerSecret
             )
 
-            let cache = NSCache<NSString, BDBOAuth1Credential>()
+            let cache = UserDefaults.standard
             
-            if let cachedRequestToken = cache.object(forKey: "requestToken") {
-                _client.requestToken = cachedRequestToken
+            if let cachedRequestToken = cache.object(forKey: "requestToken") as? Data {
+                _client.requestToken = NSKeyedUnarchiver.unarchiveObject(with: cachedRequestToken) as! BDBOAuth1Credential
             }
-            if let cachedAccessToken = cache.object(forKey: "accessToken") {
-                _client.accessToken = cachedAccessToken
+            if let cachedAccessToken = cache.object(forKey: "accessToken") as? Data {
+                _client.accessToken = NSKeyedUnarchiver.unarchiveObject(with: cachedAccessToken) as! BDBOAuth1Credential
             }
+            
         }
         
         return _client
+    }
+    
+    func authorize(){
+        if let token = requestToken.token {
+            UIApplication.shared.open(URL(string:"https://api.twitter.com/oauth/authorize?oauth_token=\(token)")!)
+        }
     }
     
     func askRequestToken(){
@@ -67,43 +154,23 @@ class Twitter: BDBOAuth1SessionManager {
         
         requestSerializer.removeAccessToken()
         
-        var request = URLRequest(
-            url: URL(string:"https://api.twitter.com/oauth/request_token")!,
-            cachePolicy: NSURLRequest.CachePolicy.reloadIgnoringLocalCacheData,
-            timeoutInterval: 10)
-        
-        request.setValue("OAuth oauth_consumer_key=\"JWJtknZ97A6n5XtXgA3PfpYto\",oauth_signature_method=\"HMAC-SHA1\",oauth_timestamp=\"1477733623\",oauth_nonce=\"ZBERMd\",oauth_version=\"1.0\",oauth_signature=\"fpVf5uj0%2FS9rL%2F%2FmjJkBvP0c6QU%3D\"", forHTTPHeaderField: "Authorization")
-        
-        let session = URLSession(
-            configuration: URLSessionConfiguration.default,
-            delegate: nil,
-            delegateQueue: OperationQueue.main
-        )
-        
-        let task:URLSessionDataTask = session.dataTask(
-            with: request,
-            completionHandler:{ (data:Data?, response:URLResponse?, error:Error?) in
-                print("MANUAL",NSString(data: (data)!, encoding: String.Encoding.utf8.rawValue),response, error)
-            }
-        )
-        
-        task.resume();
-        
-        
         fetchRequestToken(
             withPath: "/oauth/request_token",
             method: "GET",
             callbackURL: URL(string:"haodt1990twitter://oauth"),
             scope: nil,
             success: { (response:BDBOAuth1Credential?) in
-                print("got request token",response)
-                
-                let authUrl = NSURL(string:"https://api.twitter.com/oauth/authorize?oauth_token=\(response?.token)")
-                UIApplication.shared.open(authUrl! as URL)
-                
+                print("got request token")
+                if let response = response {
+                    self.requestToken = response
+                    self.authorize()
+                }
             },
             failure: { (error:Error?) in
-                print("error fetching request token",error?.localizedDescription,self.requestSerializer.debugDescription,self.requestSerializer.oAuthParameters())
+                print("error fetching request token")
+                if let error = error {
+                    print(error.localizedDescription)
+                }
             }
         )
     }
@@ -125,14 +192,17 @@ class Twitter: BDBOAuth1SessionManager {
             requestToken: requestToken,
             success: { (response:BDBOAuth1Credential?) in
                 
-                print("i have access token now",response)
-                
-                self.accessToken = BDBOAuth1Credential(token: response?.token, secret: response?.secret, expiration: nil)
-
+                print("i have access token now")
+                if let response = response {
+                    self.accessToken = response
+                }
                 
             },
             failure: { (error:Error?) in
-                print("access token error",error?.localizedDescription)
+                print("access token error")
+                if let error = error {
+                    print(error.localizedDescription)
+                }
             }
         )
     }
