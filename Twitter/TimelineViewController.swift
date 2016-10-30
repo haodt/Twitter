@@ -87,7 +87,9 @@ class TimelineViewController: UIViewController {
         if let identifier = segue.identifier {
             
             switch(identifier){
-                
+                case "logOut":
+                    Twitter.logout()
+                    break
                 case "showDetail":
                     let nav = segue.destination as! UINavigationController
                     let detail = nav.topViewController as! TweetViewController

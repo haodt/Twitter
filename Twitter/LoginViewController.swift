@@ -9,19 +9,25 @@
 import UIKit
 
 class LoginViewController: UIViewController {
-
-    override func viewDidAppear(_ animated: Bool) {
-
+    
+    func askAccessToken(){
         let client = Twitter.client()!
-        
-        if client.isAuthorized {
-            let timeline = self.storyboard?.instantiateViewController(withIdentifier: "TimelineViewController") as! TimelineViewController
-            let navigation = UINavigationController(rootViewController: timeline)
-            
-            self.present(navigation, animated: true, completion: nil)
-            
+        if client.requestToken != nil {
+            if client.accessToken != nil {
+                self.presentTimeline()
+                return
+            }
+            client.askAccessToken(completion: {(client:Twitter) in
+                self.presentTimeline()
+            })
         }
+    }
+    
+    func presentTimeline(){
+        let timeline = self.storyboard?.instantiateViewController(withIdentifier: "TimelineViewController") as! TimelineViewController
+        let navigation = UINavigationController(rootViewController: timeline)
         
+        self.present(navigation, animated: true, completion: nil)
     }
     
     override func viewDidLoad() {
@@ -37,7 +43,15 @@ class LoginViewController: UIViewController {
     @IBAction func onLogin(_ sender: AnyObject) {
         
         if let client = Twitter.client() {
-            client.askRequestToken()
+            
+            if client.requestToken == nil {
+                
+                client.askRequestToken()
+                return
+            
+            }
+            askAccessToken()
+            
         }
         
     }

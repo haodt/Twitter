@@ -37,6 +37,7 @@ class Twitter: BDBOAuth1SessionManager {
             
             cache.set(data, forKey: "accessToken")
             self.requestSerializer.saveAccessToken(accessToken)
+            
         }
     }
     
@@ -115,7 +116,7 @@ class Twitter: BDBOAuth1SessionManager {
         
     }
     
-    private static var _client:Twitter!
+    internal static var _client:Twitter!
     
     static func client() -> Twitter! {
         
@@ -140,6 +141,24 @@ class Twitter: BDBOAuth1SessionManager {
         return _client
     }
     
+    static func logout(){
+        if let client = Twitter.client() {
+            
+            client.requestSerializer.removeAccessToken()
+            
+            _client = Twitter(
+                baseURL: URL(string:"https://api.twitter.com/"),
+                consumerKey: consumerKey,
+                consumerSecret: consumerSecret
+            )
+            
+            let cache = UserDefaults.standard
+            
+            cache.removeObject(forKey: "requestToken")
+            cache.removeObject(forKey: "accessToken")
+        }
+    }
+    
     func authorize(){
         if let token = requestToken.token {
             UIApplication.shared.open(URL(string:"https://api.twitter.com/oauth/authorize?oauth_token=\(token)")!)
@@ -151,8 +170,6 @@ class Twitter: BDBOAuth1SessionManager {
             print("You already had request token")
             return;
         }
-        
-        requestSerializer.removeAccessToken()
         
         fetchRequestToken(
             withPath: "/oauth/request_token",
@@ -175,7 +192,7 @@ class Twitter: BDBOAuth1SessionManager {
         )
     }
     
-    func askAccessToken(){
+    func askAccessToken(completion:@escaping ((Twitter)->Void)){
         if requestToken == nil {
             print("You dont have any request token")
             return;
@@ -196,7 +213,7 @@ class Twitter: BDBOAuth1SessionManager {
                 if let response = response {
                     self.accessToken = response
                 }
-                
+                completion(self)
             },
             failure: { (error:Error?) in
                 print("access token error")

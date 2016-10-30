@@ -20,11 +20,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         UINavigationBar.appearance().barTintColor = UIColor(red:0.00, green:0.67, blue:0.93, alpha:1.0)
         UINavigationBar.appearance().tintColor = UIColor.white
         // Override point for customization after application launch.
+        self.window = UIWindow(frame: UIScreen.main.bounds)
+        
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+        
+        if let client = Twitter.client() {
+            
+            if client.isAuthorized {
+            
+                let timeline = storyboard.instantiateViewController(withIdentifier: "TimelineViewController") as! TimelineViewController
+                let navigation = UINavigationController(rootViewController: timeline)
+                
+                self.window?.rootViewController = navigation
+                
+            }
+            else {
+                
+                let login = storyboard.instantiateViewController(withIdentifier: "LoginViewController") as! LoginViewController
+                
+                self.window?.rootViewController = login
+                
+            }
+            
+            self.window?.makeKeyAndVisible()
+        }
+
         return true
     }
     
     func application(_ app: UIApplication, open url: URL, options: [UIApplicationOpenURLOptionsKey : Any] = [:]) -> Bool {
-        
+
         if let queries = url.query?.components(separatedBy: "&") {
             let isAccepted = queries.filter({ (q) -> Bool in
                 return q.contains("oauth_token")
@@ -37,7 +62,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 let client = Twitter.client()!
                 
                 client.requestToken = request;
-                client.askAccessToken()
+                
+                if let current = self.window?.rootViewController as? LoginViewController {
+                
+                    current.askAccessToken()
+                
+                }
+                
+                
             }
         }
         
